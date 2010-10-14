@@ -29,6 +29,10 @@
  */
 package org.binarystor.tools.dbplayback;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.sql.*;
 
 /**
@@ -70,14 +74,68 @@ public class MySQL {
         }
     }
 
-    public void executeScript(String schema, String sqlstmt) throws SQLException {
+    public void createVersionTable(String schema) throws SQLException {
+        String createSQL = "CREATE  TABLE dbPlayback (version INT UNSIGNED NOT NULL ,"
+                + "hostname VARCHAR(45) NOT NULL ,"
+                + "script VARCHAR(45) NOT NULL ,"
+                + "applied TIMESTAMP NOT NULL ,"
+                + "status INT NOT NULL ,"
+                + "message VARCHAR(255) NOT NULL ,"
+                + "PRIMARY KEY (version) );";
+        conn.setCatalog(schema);
+        Statement stmt = conn.createStatement();
+        stmt.executeUpdate(createSQL);
+    }
+
+    public int getLastApplied(String schema){
+        return 1;
+    }
+
+    public void setLastApplied(String schema, int version, String script, int status, String message) throws SQLException{
         try {
-            conn.setCatalog(schema);
-            Statement stmt = conn.createStatement();
-            stmt.executeUpdate(sqlstmt);
-        } catch (SQLException sqle) {
+        String insertVersion = "INSERT INTO dbPlayback (version, hostname, script, applied, status, message) VALUES (" +
+                 version + ",'" +
+                 InetAddress.getLocalHost().getHostAddress() + "','" +
+                 script + "',NOW()," +
+                 status + ",'" +
+                 message + "');";
+        conn.setCatalog(schema);
+        Statement stmt = conn.createStatement();
+        stmt.executeUpdate(insertVersion);
+        } catch (UnknownHostException uhe){
+            System.err.println(uhe.getMessage());
         }
     }
 
-    
+    public void executeScript(String schema, BufferedReader script) throws SQLException {
+        String line;
+        StringBuilder sb = new StringBuilder();
+        try {
+            while ((line = script.readLine()) != null) {
+                //Strip standalone comments
+                if (!(line.startsWith("--") || line.startsWith("/*") || line.length() == 0)) {
+                    sb.append(line);
+                }
+            }
+            for (String sqlstmt : sb.toString().replaceAll("(?i)(^|;)(ALTER|CREATE|DROP|INSERT|RENAME|SET)", "$1ZZZZ$2").split("ZZZZ")) {
+                if (!sqlstmt.equals("")) {
+                    //Ok lets see if the database exists - if not create it
+                    try {
+                        conn.setCatalog(schema);
+                    } catch (SQLException sqle) {
+                        Statement stmt = conn.createStatement();
+                        stmt.executeUpdate("CREATE DATABASE " + schema);
+                        stmt.close();
+                        conn.setCatalog(schema);
+                    }
+
+                    conn.setCatalog(schema);
+                    Statement stmt = conn.createStatement();
+                    stmt.executeUpdate(sqlstmt);
+                }
+            }
+        } catch (IOException ioe) {
+            System.err.println(ioe.getMessage());
+        }
+    }
 }

@@ -52,11 +52,11 @@ public class Repository {
     }
 
     public String getType() {
-        return name;
+        return type;
     }
 
     public void setType(String value) {
-        name = value;
+        type = value;
     }
 
     public String getHostname() {

@@ -31,15 +31,16 @@ package org.binarystor.tools.dbplayback;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
+import java.util.SortedMap;
 
-import com.perforce.p4java.client.IClient;
+import com.perforce.p4java.core.file.FileAction;
 import com.perforce.p4java.core.file.FileSpecBuilder;
 import com.perforce.p4java.core.file.FileSpecOpStatus;
 import com.perforce.p4java.core.file.IFileSpec;
@@ -48,7 +49,6 @@ import com.perforce.p4java.exception.P4JavaException;
 import com.perforce.p4java.exception.ConnectionException;
 import com.perforce.p4java.exception.RequestException;
 import com.perforce.p4java.server.IServer;
-import com.perforce.p4java.server.IServerInfo;
 import com.perforce.p4java.server.ServerFactory;
 
 /**
@@ -63,12 +63,14 @@ public class Perforce {
     private String username;
     private String password;
     private String root;
+    private boolean verbose = true;
 
     public Perforce(String hostname, int port, String username, String password, String root) throws ConnectionException {
         this.hostname = hostname;
         this.port = port;
         this.username = username;
         this.password = password;
+        this.root = root;
         connect();
     }
 
@@ -112,7 +114,7 @@ public class Perforce {
     public List<IFileSpec> listFiles(String path) {
         List<IFileSpec> files = null;
         try {
-            files = server.getDepotFiles(FileSpecBuilder.makeFileSpecList(new String[]{path + "/..."}), false);
+            files = server.getDepotFiles(FileSpecBuilder.getValidFileSpecs(FileSpecBuilder.makeFileSpecList(new String[]{path})), false);
         } catch (ConnectionException ce) {
             System.err.println(ce.getMessage());
         } catch (AccessException ae) {
@@ -124,42 +126,50 @@ public class Perforce {
     public void play(String schema, MySQL db) {
         try {
             //Process DDL
-            TreeMap<String, IFileSpec> scripts = new TreeMap();
-            List<IFileSpec> fileList = listFiles(root + "/" + schema + "/ddl/...");
+            SortedMap<Integer, IFileSpec> scripts = new TreeMap();
+            List<IFileSpec> fileList = listFiles(root + "/" + schema + "/ddl/*");
             for (IFileSpec fileSpec : fileList) {
                 if (fileSpec != null) {
-                    if (fileSpec.getOpStatus() == FileSpecOpStatus.VALID) {
+                    //May need to improve this and add other file actions to be ignored
+                    if (fileSpec.getAction() != FileAction.DELETE) {
                         String fullPath = fileSpec.getDepotPathString();
                         int dot = fullPath.lastIndexOf(".");
                         int sep = fullPath.lastIndexOf("/");
                         String filename = fullPath.substring(sep + 1, dot);
                         if (filename.startsWith("upgrade")) {
-                            scripts.put(fullPath.substring(sep + 1, dot).replaceAll("[^\\d]", ""), fileSpec);
+                            scripts.put(new Integer(fullPath.substring(sep + 1, dot).replaceAll("[^\\d]", "")), fileSpec);
                         }
-                    } else {
-                        System.err.println(fileSpec.getStatusMessage());
                     }
                 }
             }
-            StringBuilder sb = new StringBuilder();
-            String line;
-            BufferedReader reader = new BufferedReader(new InputStreamReader(scripts.get(scripts.firstKey()).getContents(true), "UTF-8"));
-            while ((line = reader.readLine()) != null) {
-                if (!(line.startsWith("--") || line.startsWith("/*") || line.length() == 0)) {
-                    sb.append(line);
+
+            //Get last applied script
+            int lastApplied = db.getLastApplied(schema);
+            if (scripts.lastKey() > lastApplied){
+
+            for (Map.Entry<Integer, IFileSpec> script : scripts.entrySet()) {
+                if (verbose) {
+                    System.out.println("Processing Script: " + script.getValue().getDepotPathString());
                 }
+                BufferedReader scriptContents = new BufferedReader(new InputStreamReader(script.getValue().getContents(true), "UTF-8"));
+                db.executeScript(schema, scriptContents);
+                //Update version table
+                db.setLastApplied(schema, script.getKey(), script.getValue().getDepotPathString(), 1 , "");
             }
-            for (String sqlstmt : sb.toString().replaceAll("(?i)(^|;)(CREATE|DROP|INSERT|SET)", "$1ZZZZ$2").split("ZZZZ")) {
-                if (!sqlstmt.equals("")) {
-                    db.executeScript(schema, sqlstmt);
-                }
+
             }
+
         } catch (SQLException sqle) {
+            System.err.println(sqle.getMessage());
+            System.exit(1);
         } catch (AccessException ae) {
-        } catch (ConnectionException c) {
+            System.err.println(ae.getMessage());
+        } catch (ConnectionException ce) {
+            System.err.println(ce.getMessage());
         } catch (RequestException re) {
+            System.err.println(re.getMessage());
         } catch (UnsupportedEncodingException uee) {
-        } catch (IOException ioe) {
+            System.err.println(uee.getMessage());
         }
 
     }

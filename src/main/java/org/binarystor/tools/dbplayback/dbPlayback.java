@@ -46,19 +46,6 @@ import org.yaml.snakeyaml.JavaBeanLoader;
 
 import org.kohsuke.args4j.*;
 
-import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
-import org.tmatesoft.svn.core.internal.io.fs.FSRepositoryFactory;
-import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
-import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
-import org.tmatesoft.svn.core.io.diff.SVNDeltaGenerator;
-
 import org.jivesoftware.smack.ChatManager;
 import org.jivesoftware.smack.Chat;
 import org.jivesoftware.smack.MessageListener;
@@ -260,7 +247,7 @@ public class dbPlayback {
                 if (perforceRepositories.containsKey(schema.getRepository())){
                     //What database are we using?
                     if (mysqlDatabases.containsKey(schema.getDatabase())){
-                        perforceRepositories.get(schema.getRepository()).play(schema.getName(), mysqlDatabases.get(schema.getRepository()));
+                        perforceRepositories.get(schema.getRepository()).play(schema.getName(), mysqlDatabases.get(schema.getDatabase()));
                     }
                 }
             }
