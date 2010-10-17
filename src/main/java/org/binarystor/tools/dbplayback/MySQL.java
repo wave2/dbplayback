@@ -74,10 +74,24 @@ public class MySQL {
         }
     }
 
-    public void createVersionTable(String schema) throws SQLException {
+    public void checkSchema(String schema) throws SQLException {
+        //Ok lets see if the database exists - if not create it
+        try {
+            conn.setCatalog(schema);
+        } catch (SQLException sqle) {
+            Statement stmt = conn.createStatement();
+            //Create Schema
+            stmt.executeUpdate("CREATE DATABASE " + schema);
+            stmt.close();
+            //Create dbPlayback version table
+            createVersionTable(schema);
+        }
+    }
+
+    private void createVersionTable(String schema) throws SQLException {
         String createSQL = "CREATE  TABLE dbPlayback (version INT UNSIGNED NOT NULL ,"
-                + "hostname VARCHAR(45) NOT NULL ,"
-                + "script VARCHAR(45) NOT NULL ,"
+                + "hostname VARCHAR(255) NOT NULL ,"
+                + "script VARCHAR(255) NOT NULL ,"
                 + "applied TIMESTAMP NOT NULL ,"
                 + "status INT NOT NULL ,"
                 + "message VARCHAR(255) NOT NULL ,"
@@ -85,24 +99,51 @@ public class MySQL {
         conn.setCatalog(schema);
         Statement stmt = conn.createStatement();
         stmt.executeUpdate(createSQL);
+        stmt.close();
     }
 
-    public int getLastApplied(String schema){
-        return 1;
-    }
-
-    public void setLastApplied(String schema, int version, String script, int status, String message) throws SQLException{
+    public int getVersion(String schema) {
+        int version = 0;
         try {
-        String insertVersion = "INSERT INTO dbPlayback (version, hostname, script, applied, status, message) VALUES (" +
-                 version + ",'" +
-                 InetAddress.getLocalHost().getHostAddress() + "','" +
-                 script + "',NOW()," +
-                 status + ",'" +
-                 message + "');";
-        conn.setCatalog(schema);
-        Statement stmt = conn.createStatement();
-        stmt.executeUpdate(insertVersion);
-        } catch (UnknownHostException uhe){
+            conn.setCatalog("INFORMATION_SCHEMA");
+            Statement s = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            s.executeQuery("SELECT COUNT(*) AS table_exists FROM TABLES WHERE TABLE_SCHEMA='" + schema + "' AND TABLE_NAME='dbPlayback';");
+            ResultSet rs = s.getResultSet();
+            rs.next();
+            if (rs.getInt("table_exists") == 1) {
+                //Version table exists - get latest version
+                conn.setCatalog(schema);
+                Statement stmt = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                stmt.executeQuery("SELECT MAX(version) AS version FROM dbPlayback;");
+                rs = stmt.getResultSet();
+                if (rs.next()) {
+                    version = rs.getInt("version");
+                }
+                stmt.close();
+            } else {
+                //Create missin version table
+                createVersionTable(schema);
+            }
+            s.close();
+        } catch (SQLException sqle) {
+            System.err.println(sqle.getMessage());
+        }
+        return version;
+    }
+
+    public void setVersion(String schema, int version, String script, int status, String message) throws SQLException {
+        try {
+            String insertVersion = "INSERT INTO dbPlayback (version, hostname, script, applied, status, message) VALUES ("
+                    + version + ",'"
+                    + InetAddress.getLocalHost().getHostAddress() + "','"
+                    + script + "',NOW(),"
+                    + status + ",'"
+                    + message + "');";
+            conn.setCatalog(schema);
+            Statement stmt = conn.createStatement();
+            stmt.executeUpdate(insertVersion);
+            stmt.close();
+        } catch (UnknownHostException uhe) {
             System.err.println(uhe.getMessage());
         }
     }
@@ -119,19 +160,10 @@ public class MySQL {
             }
             for (String sqlstmt : sb.toString().replaceAll("(?i)(^|;)(ALTER|CREATE|DROP|INSERT|RENAME|SET)", "$1ZZZZ$2").split("ZZZZ")) {
                 if (!sqlstmt.equals("")) {
-                    //Ok lets see if the database exists - if not create it
-                    try {
-                        conn.setCatalog(schema);
-                    } catch (SQLException sqle) {
-                        Statement stmt = conn.createStatement();
-                        stmt.executeUpdate("CREATE DATABASE " + schema);
-                        stmt.close();
-                        conn.setCatalog(schema);
-                    }
-
                     conn.setCatalog(schema);
                     Statement stmt = conn.createStatement();
                     stmt.executeUpdate(sqlstmt);
+                    stmt.close();
                 }
             }
         } catch (IOException ioe) {

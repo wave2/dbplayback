@@ -42,7 +42,6 @@ import java.util.SortedMap;
 
 import com.perforce.p4java.core.file.FileAction;
 import com.perforce.p4java.core.file.FileSpecBuilder;
-import com.perforce.p4java.core.file.FileSpecOpStatus;
 import com.perforce.p4java.core.file.IFileSpec;
 import com.perforce.p4java.exception.AccessException;
 import com.perforce.p4java.exception.P4JavaException;
@@ -143,25 +142,28 @@ public class Perforce {
                 }
             }
 
+            //Check if schema exists and create if not
+            db.checkSchema(schema);
             //Get last applied script
-            int lastApplied = db.getLastApplied(schema);
-            if (scripts.lastKey() > lastApplied){
+            int currentVersion = db.getVersion(schema);
+            if (scripts.lastKey() > currentVersion) {
 
-            for (Map.Entry<Integer, IFileSpec> script : scripts.entrySet()) {
-                if (verbose) {
-                    System.out.println("Processing Script: " + script.getValue().getDepotPathString());
+                for (Map.Entry<Integer, IFileSpec> script : scripts.entrySet()) {
+                    if (script.getKey() > currentVersion) {
+                        if (verbose) {
+                            System.out.println("Processing Script: " + script.getValue().getDepotPathString());
+                        }
+                        BufferedReader scriptContents = new BufferedReader(new InputStreamReader(script.getValue().getContents(true), "UTF-8"));
+                        db.executeScript(schema, scriptContents);
+                        //Update version table
+                        db.setVersion(schema, script.getKey(), script.getValue().getDepotPathString(), 1, "");
+                    }
                 }
-                BufferedReader scriptContents = new BufferedReader(new InputStreamReader(script.getValue().getContents(true), "UTF-8"));
-                db.executeScript(schema, scriptContents);
-                //Update version table
-                db.setLastApplied(schema, script.getKey(), script.getValue().getDepotPathString(), 1 , "");
-            }
 
             }
 
         } catch (SQLException sqle) {
             System.err.println(sqle.getMessage());
-            System.exit(1);
         } catch (AccessException ae) {
             System.err.println(ae.getMessage());
         } catch (ConnectionException ce) {
