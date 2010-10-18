@@ -54,7 +54,7 @@ import com.perforce.p4java.server.ServerFactory;
  *
  * @author Alan Snelson
  */
-public class Perforce {
+public class Perforce implements Repository {
 
     private IServer server;
     private String hostname;
@@ -87,7 +87,7 @@ public class Perforce {
 
     }
 
-    public ArrayList<String> listDirectories(String path) {
+    private ArrayList<String> listDirectories(String path) {
         ArrayList<String> directories = new ArrayList();
         try {
             List<IFileSpec> dirList = server.getDirectories(
@@ -110,7 +110,7 @@ public class Perforce {
         return directories;
     }
 
-    public List<IFileSpec> listFiles(String path) {
+    private List<IFileSpec> listFiles(String path) {
         List<IFileSpec> files = null;
         try {
             files = server.getDepotFiles(FileSpecBuilder.getValidFileSpecs(FileSpecBuilder.makeFileSpecList(new String[]{path})), false);
@@ -122,7 +122,7 @@ public class Perforce {
         return files;
     }
 
-    public void play(String schema, MySQL db) {
+    public void play(String schema, Database db) {
         try {
             //Process DDL
             SortedMap<Integer, IFileSpec> scripts = new TreeMap();

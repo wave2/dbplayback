@@ -29,7 +29,11 @@
  */
 package org.binarystor.tools.dbplayback;
 
-import org.binarystor.tools.dbplayback.config.*;
+import org.binarystor.tools.dbplayback.config.dbPlaybackConfig;
+import org.binarystor.tools.dbplayback.config.NotificationMethod;
+import org.binarystor.tools.dbplayback.config.Repository;
+import org.binarystor.tools.dbplayback.config.Database;
+import org.binarystor.tools.dbplayback.config.Schema;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;

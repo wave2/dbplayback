@@ -39,7 +39,7 @@ import java.sql.*;
  *
  * @author Alan Snelson
  */
-public class MySQL {
+public class MySQL implements Database {
 
     private Connection conn = null;
     private String hostname;
