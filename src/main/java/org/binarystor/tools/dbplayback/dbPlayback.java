@@ -217,12 +217,12 @@ public class dbPlayback {
             HashMap<String, Perforce> perforceRepositories = new HashMap<String, Perforce>();
             Repository[] repositories = config.getRepository();
             for (Repository repository : repositories) {
-                try{
-                    if (repository.getType().equals("perforce")){
+                try {
+                    if (repository.getType().equals("perforce")) {
                         perforceRepositories.put(repository.getName(), new Perforce(repository.getHostname(), repository.getPort(), repository.getUsername(), repository.getPassword(), repository.getRoot()));
                     }
-                } catch (ConnectionException ce){
-                    if (verbose){
+                } catch (ConnectionException ce) {
+                    if (verbose) {
                         System.out.println(ce.getMessage());
                     }
                     notifyMessage += "Failed to connect to Perforce repository: " + ce.getMessage();
@@ -232,26 +232,23 @@ public class dbPlayback {
             //Create the MySQL database objects
             HashMap<String, MySQL> mysqlDatabases = new HashMap<String, MySQL>();
             Database[] databases = config.getDatabase();
-            for (Database database : databases){
-                if (database.getType().equals("mysql")){
-                    try{
-                        mysqlDatabases.put(database.getName(), new MySQL(database.getHostname(), database.getPort(), database.getUsername(), database.getPassword()));
-                    } catch (SQLException sqle){
-                        if (verbose){
-                            System.err.println(sqle.getMessage());
-                        }
-                    }
-                    }
+            for (Database database : databases) {
+                if (database.getType().equals("mysql")) {
+                    mysqlDatabases.put(database.getName(), new MySQL(database.getHostname(), database.getPort(), database.getUsername(), database.getPassword()));
+                }
             }
 
             //Process Schemata
             Schema[] schemata = config.getSchemata();
-            for (Schema schema : schemata){
+            for (Schema schema : schemata) {
                 //What repo holds the scripts?
-                if (perforceRepositories.containsKey(schema.getRepository())){
+                if (perforceRepositories.containsKey(schema.getRepository())) {
                     //What database are we using?
-                    if (mysqlDatabases.containsKey(schema.getDatabase())){
-                        perforceRepositories.get(schema.getRepository()).play(schema.getName(), mysqlDatabases.get(schema.getDatabase()));
+                    if (mysqlDatabases.containsKey(schema.getDatabase())) {
+                        if (verbose) {
+                            System.out.println("Processing " + schema.getName());
+                        }
+                        notifyMessage += perforceRepositories.get(schema.getRepository()).play(schema.getName(), mysqlDatabases.get(schema.getDatabase()));
                     }
                 }
             }

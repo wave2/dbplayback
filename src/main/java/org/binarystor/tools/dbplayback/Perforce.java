@@ -122,7 +122,8 @@ public class Perforce implements Repository {
         return files;
     }
 
-    public void play(String schema, Database db) {
+    public String play(String schema, Database db) {
+        String result = "";
         try {
             //Process DDL
             SortedMap<Integer, IFileSpec> scripts = new TreeMap();
@@ -143,27 +144,34 @@ public class Perforce implements Repository {
             }
 
             //Check if schema exists and create if not
-            db.checkSchema(schema);
-            //Get last applied script
-            int currentVersion = db.getVersion(schema);
-            if (scripts.lastKey() > currentVersion) {
+            if (db.checkSchema(schema)) {
+                //Get last applied script
+                int currentVersion = db.getVersion(schema);
+                if (scripts.lastKey() > currentVersion) {
 
-                for (Map.Entry<Integer, IFileSpec> script : scripts.entrySet()) {
-                    if (script.getKey() > currentVersion) {
-                        if (verbose) {
-                            System.out.println("Processing Script: " + script.getValue().getDepotPathString());
+                    for (Map.Entry<Integer, IFileSpec> script : scripts.entrySet()) {
+                        if (script.getKey() > currentVersion) {
+                            if (verbose) {
+                                System.out.println("Processing Script: " + script.getValue().getDepotPathString());
+                            }
+                            BufferedReader scriptContents = new BufferedReader(new InputStreamReader(script.getValue().getContents(true), "UTF-8"));
+                            String errMessage = db.executeScript(schema, scriptContents);
+                            //Update version table
+                            if (errMessage.isEmpty()) {
+                                if (db.setVersion(schema, script.getKey(), script.getValue().getDepotPathString(), 1, "")){
+                                    //Success
+
+                                }
+                            } else {
+                                result = errMessage;
+                                if (db.setVersion(schema, script.getKey(), script.getValue().getDepotPathString(), 0, errMessage)){
+                                    //Failure
+                                 }
+                            }
                         }
-                        BufferedReader scriptContents = new BufferedReader(new InputStreamReader(script.getValue().getContents(true), "UTF-8"));
-                        db.executeScript(schema, scriptContents);
-                        //Update version table
-                        db.setVersion(schema, script.getKey(), script.getValue().getDepotPathString(), 1, "");
                     }
                 }
-
             }
-
-        } catch (SQLException sqle) {
-            System.err.println(sqle.getMessage());
         } catch (AccessException ae) {
             System.err.println(ae.getMessage());
         } catch (ConnectionException ce) {
@@ -174,5 +182,6 @@ public class Perforce implements Repository {
             System.err.println(uee.getMessage());
         }
 
+    return result;
     }
 }

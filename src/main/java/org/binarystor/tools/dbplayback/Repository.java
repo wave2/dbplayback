@@ -36,6 +36,6 @@ package org.binarystor.tools.dbplayback;
  */
 public interface Repository {
 
-    public void play(String schema, Database db);
+    public String play(String schema, Database db);
 
 }

@@ -47,7 +47,7 @@ public class MySQL implements Database {
     private String username;
     private String password;
 
-    public MySQL(String hostname, int port, String username, String password) throws SQLException {
+    public MySQL(String hostname, int port, String username, String password) {
         this.hostname = hostname;
         this.port = port;
         this.username = username;
@@ -63,43 +63,57 @@ public class MySQL implements Database {
      * @param  password  MySQL Password
      * @param  db        Default database
      */
-    private void connect(String hostname, int port, String username, String password, String db) throws SQLException {
+    private void connect(String hostname, int port, String username, String password, String db) {
         try {
             Class.forName("com.mysql.jdbc.Driver").newInstance();
             conn = DriverManager.getConnection("jdbc:mysql://" + hostname + ":" + port + "/" + db, username, password);
-        } catch (SQLException se) {
-            throw se;
+        } catch (SQLException sqle) {
+            System.err.println(sqle.getMessage());
         } catch (Exception e) {
-            throw new SQLException(e.getMessage());
+            System.err.println(e.getMessage());
         }
     }
 
-    public void checkSchema(String schema) throws SQLException {
+    public boolean checkSchema(String schema) {
         //Ok lets see if the database exists - if not create it
         try {
-            conn.setCatalog(schema);
+            conn.setCatalog("INFORMATION_SCHEMA");
+            Statement s = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            s.executeQuery("SELECT COUNT(*) AS schema_exists FROM SCHEMATA WHERE SCHEMA_NAME='" + schema + "';");
+            ResultSet rs = s.getResultSet();
+            rs.next();
+            if (rs.getInt("schema_exists") != 1) {
+                Statement stmt = conn.createStatement();
+                //Create Schema
+                stmt.executeUpdate("CREATE DATABASE " + schema);
+                stmt.close();
+                //Create dbPlayback version table
+                createVersionTable(schema);
+            }
         } catch (SQLException sqle) {
-            Statement stmt = conn.createStatement();
-            //Create Schema
-            stmt.executeUpdate("CREATE DATABASE " + schema);
-            stmt.close();
-            //Create dbPlayback version table
-            createVersionTable(schema);
+            System.err.println(sqle.getMessage());
+            return false;
         }
+        return true;
     }
 
-    private void createVersionTable(String schema) throws SQLException {
-        String createSQL = "CREATE  TABLE dbPlayback (version INT UNSIGNED NOT NULL ,"
-                + "hostname VARCHAR(255) NOT NULL ,"
-                + "script VARCHAR(255) NOT NULL ,"
-                + "applied TIMESTAMP NOT NULL ,"
-                + "status INT NOT NULL ,"
-                + "message VARCHAR(255) NOT NULL ,"
-                + "PRIMARY KEY (version) );";
-        conn.setCatalog(schema);
-        Statement stmt = conn.createStatement();
-        stmt.executeUpdate(createSQL);
-        stmt.close();
+    private void createVersionTable(String schema) {
+        try {
+            //TODO consider a better primary key
+            String createSQL = "CREATE  TABLE dbPlayback (version INT UNSIGNED NOT NULL ,"
+                    + "hostname VARCHAR(255) NOT NULL ,"
+                    + "script VARCHAR(255) NOT NULL ,"
+                    + "applied TIMESTAMP NOT NULL ,"
+                    + "status INT NOT NULL ,"
+                    + "message VARCHAR(255) NOT NULL ,"
+                    + "PRIMARY KEY (version, applied) );";
+            conn.setCatalog(schema);
+            Statement stmt = conn.createStatement();
+            stmt.executeUpdate(createSQL);
+            stmt.close();
+        } catch (SQLException sqle) {
+            System.err.println(sqle.getMessage());
+        }
     }
 
     public int getVersion(String schema) {
@@ -114,7 +128,7 @@ public class MySQL implements Database {
                 //Version table exists - get latest version
                 conn.setCatalog(schema);
                 Statement stmt = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY);
-                stmt.executeQuery("SELECT MAX(version) AS version FROM dbPlayback;");
+                stmt.executeQuery("SELECT MAX(version) AS version FROM dbPlayback WHERE status=1;");
                 rs = stmt.getResultSet();
                 if (rs.next()) {
                     version = rs.getInt("version");
@@ -131,24 +145,30 @@ public class MySQL implements Database {
         return version;
     }
 
-    public void setVersion(String schema, int version, String script, int status, String message) throws SQLException {
+    public boolean setVersion(String schema, int version, String script, int status, String message) {
         try {
-            String insertVersion = "INSERT INTO dbPlayback (version, hostname, script, applied, status, message) VALUES ("
-                    + version + ",'"
-                    + InetAddress.getLocalHost().getHostAddress() + "','"
-                    + script + "',NOW(),"
-                    + status + ",'"
-                    + message + "');";
+            String insertVersion = "INSERT INTO dbPlayback (version, hostname, script, applied, status, message) VALUES (?,?,?,NOW(),?,?);";
             conn.setCatalog(schema);
-            Statement stmt = conn.createStatement();
-            stmt.executeUpdate(insertVersion);
+            PreparedStatement stmt = conn.prepareStatement(insertVersion);
+            stmt.setInt(1, version);
+            stmt.setString(2, InetAddress.getLocalHost().getHostAddress());
+            stmt.setString(3, script);
+            stmt.setInt(4, status);
+            stmt.setString(5, message);
+            stmt.executeUpdate();
             stmt.close();
         } catch (UnknownHostException uhe) {
             System.err.println(uhe.getMessage());
+            return false;
+        } catch (SQLException sqle) {
+            System.err.println(sqle.getMessage());
+            return false;
         }
+        return true;
     }
 
-    public void executeScript(String schema, BufferedReader script) throws SQLException {
+    public String executeScript(String schema, BufferedReader script) {
+        String result = "";
         String line;
         StringBuilder sb = new StringBuilder();
         try {
@@ -158,16 +178,32 @@ public class MySQL implements Database {
                     sb.append(line);
                 }
             }
+            conn.setCatalog(schema);
+            conn.setAutoCommit(false);
+            Statement stmt = conn.createStatement();
             for (String sqlstmt : sb.toString().replaceAll("(?i)(^|;)(ALTER|CREATE|DROP|INSERT|RENAME|SET)", "$1ZZZZ$2").split("ZZZZ")) {
                 if (!sqlstmt.equals("")) {
-                    conn.setCatalog(schema);
-                    Statement stmt = conn.createStatement();
-                    stmt.executeUpdate(sqlstmt);
-                    stmt.close();
+                    stmt.addBatch(sqlstmt);
                 }
             }
+            stmt.executeBatch();
+            conn.commit();
+            conn.setAutoCommit(true);
+            stmt.close();
         } catch (IOException ioe) {
             System.err.println(ioe.getMessage());
+        } catch (SQLException sqle) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                    conn.setAutoCommit(true);
+                    return sqle.getMessage();
+                } catch (SQLException e) {
+                    return e.getMessage();
+                }
+
+            }
         }
+        return result;
     }
 }

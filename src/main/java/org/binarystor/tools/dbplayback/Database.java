@@ -39,12 +39,12 @@ import java.sql.SQLException;
 public interface Database {
 
 
-    public void checkSchema(String schema) throws SQLException;
+    public boolean checkSchema(String schema);
 
     public int getVersion(String schema);
 
-    public void setVersion(String schema, int version, String script, int status, String message) throws SQLException;
+    public boolean setVersion(String schema, int version, String script, int status, String message);
 
-    public void executeScript(String schema, BufferedReader script) throws SQLException;
+    public String executeScript(String schema, BufferedReader script);
 
 }
