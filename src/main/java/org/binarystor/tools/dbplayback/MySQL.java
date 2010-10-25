@@ -74,6 +74,7 @@ public class MySQL implements Database {
         }
     }
 
+    @Override
     public boolean checkSchema(String schema) {
         //Ok lets see if the database exists - if not create it
         try {
@@ -116,6 +117,7 @@ public class MySQL implements Database {
         }
     }
 
+    @Override
     public int getVersion(String schema) {
         int version = 0;
         try {
@@ -145,6 +147,7 @@ public class MySQL implements Database {
         return version;
     }
 
+    @Override
     public boolean setVersion(String schema, int version, String script, int status, String message) {
         try {
             String insertVersion = "INSERT INTO dbPlayback (version, hostname, script, applied, status, message) VALUES (?,?,?,NOW(),?,?);";
@@ -167,6 +170,7 @@ public class MySQL implements Database {
         return true;
     }
 
+    @Override
     public String executeScript(String schema, BufferedReader script) {
         String result = "";
         String line;

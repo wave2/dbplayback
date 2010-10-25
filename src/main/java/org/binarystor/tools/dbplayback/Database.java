@@ -31,7 +31,7 @@
 package org.binarystor.tools.dbplayback;
 
 import java.io.BufferedReader;
-import java.sql.SQLException;
+
 /**
  *
  * @author Alan Snelson

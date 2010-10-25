@@ -35,11 +35,9 @@ import org.binarystor.tools.dbplayback.config.Repository;
 import org.binarystor.tools.dbplayback.config.Database;
 import org.binarystor.tools.dbplayback.config.Schema;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.sql.SQLException;
 import java.util.*;
 import javax.mail.*;
 import javax.mail.internet.*;
