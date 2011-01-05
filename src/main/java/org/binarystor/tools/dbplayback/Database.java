@@ -38,12 +38,15 @@ import java.io.BufferedReader;
  */
 public interface Database {
 
+    public enum scriptStatus { ERROR, SUCCESS, UNKNOWN };
 
     public boolean checkSchema(String schema);
 
-    public int getVersion(String schema);
+    public scriptStatus getScriptStatus(String schema, String scriptType, int version);
 
-    public boolean setVersion(String schema, int version, String script, int status, String message);
+    public int getLatestVersion(String schema, String scriptType);
+
+    public boolean setVersion(String schema, int version, String script, String scriptType, int status, String message);
 
     public String executeScript(String schema, BufferedReader script);
 

@@ -244,9 +244,12 @@ public class dbPlayback {
                     //What database are we using?
                     if (mysqlDatabases.containsKey(schema.getDatabase())) {
                         if (verbose) {
-                            System.out.println("Processing " + schema.getName());
+                            System.out.println("Processing Schema " + schema.getName());
                         }
                         notifyMessage += perforceRepositories.get(schema.getRepository()).play(schema.getName(), mysqlDatabases.get(schema.getDatabase()));
+                        if (!notifyMessage.isEmpty()){
+                            break;
+                        }
                     }
                 }
             }

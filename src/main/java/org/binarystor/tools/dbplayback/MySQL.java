@@ -104,10 +104,11 @@ public class MySQL implements Database {
             String createSQL = "CREATE  TABLE dbPlayback (version INT UNSIGNED NOT NULL ,"
                     + "hostname VARCHAR(255) NOT NULL ,"
                     + "script VARCHAR(255) NOT NULL ,"
-                    + "applied TIMESTAMP NOT NULL ,"
+                    + "script_type CHAR(3) NOT NULL ,"
+                    + "applied_on TIMESTAMP NOT NULL ,"
                     + "status INT NOT NULL ,"
                     + "message VARCHAR(255) NOT NULL ,"
-                    + "PRIMARY KEY (version, applied) );";
+                    + "PRIMARY KEY (script_type, version, applied_on) );";
             conn.setCatalog(schema);
             Statement stmt = conn.createStatement();
             stmt.executeUpdate(createSQL);
@@ -117,9 +118,8 @@ public class MySQL implements Database {
         }
     }
 
-    @Override
-    public int getVersion(String schema) {
-        int version = 0;
+    private boolean checkVersionTable(String schema) {
+        boolean result = false;
         try {
             conn.setCatalog("INFORMATION_SCHEMA");
             Statement s = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY);
@@ -127,20 +127,34 @@ public class MySQL implements Database {
             ResultSet rs = s.getResultSet();
             rs.next();
             if (rs.getInt("table_exists") == 1) {
-                //Version table exists - get latest version
-                conn.setCatalog(schema);
-                Statement stmt = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY);
-                stmt.executeQuery("SELECT MAX(version) AS version FROM dbPlayback WHERE status=1;");
-                rs = stmt.getResultSet();
-                if (rs.next()) {
-                    version = rs.getInt("version");
-                }
-                stmt.close();
+              result = true;
             } else {
                 //Create missin version table
                 createVersionTable(schema);
             }
+            rs.close();
             s.close();
+        } catch (SQLException sqle) {
+            System.err.println(sqle.getMessage());
+        }
+        return result;
+    }
+
+    @Override
+    public int getLatestVersion(String schema, String scriptType) {
+        int version = 0;
+        try {
+            if (checkVersionTable(schema)) {
+                //Version table exists - get latest version
+                conn.setCatalog(schema);
+                PreparedStatement stmt = conn.prepareStatement("SELECT MAX(version) AS version FROM dbPlayback WHERE script_type=?;");
+                stmt.setString(1, scriptType);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    version = rs.getInt("version");
+                }
+                stmt.close();
+            }
         } catch (SQLException sqle) {
             System.err.println(sqle.getMessage());
         }
@@ -148,16 +162,17 @@ public class MySQL implements Database {
     }
 
     @Override
-    public boolean setVersion(String schema, int version, String script, int status, String message) {
+    public boolean setVersion(String schema, int version, String script, String scriptType, int status, String message) {
         try {
-            String insertVersion = "INSERT INTO dbPlayback (version, hostname, script, applied, status, message) VALUES (?,?,?,NOW(),?,?);";
+            String insertVersion = "INSERT INTO dbPlayback (version, hostname, script, script_type, applied_on, status, message) VALUES (?,?,?,?,NOW(),?,?);";
             conn.setCatalog(schema);
             PreparedStatement stmt = conn.prepareStatement(insertVersion);
             stmt.setInt(1, version);
             stmt.setString(2, InetAddress.getLocalHost().getHostAddress());
             stmt.setString(3, script);
-            stmt.setInt(4, status);
-            stmt.setString(5, message);
+            stmt.setString(4, scriptType);
+            stmt.setInt(5, status);
+            stmt.setString(6, message);
             stmt.executeUpdate();
             stmt.close();
         } catch (UnknownHostException uhe) {
@@ -168,6 +183,29 @@ public class MySQL implements Database {
             return false;
         }
         return true;
+    }
+
+    @Override
+    public scriptStatus getScriptStatus(String schema, String scriptType, int version) {
+        scriptStatus status = scriptStatus.UNKNOWN;
+        try {
+            if (checkVersionTable(schema)) {
+                //Version table exists - get latest version
+                conn.setCatalog(schema);
+                PreparedStatement stmt = conn.prepareStatement("SELECT status FROM dbPlayback WHERE version = ? AND script_type=?;");
+                stmt.setInt(1, version);
+                stmt.setString(2, scriptType);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    status = scriptStatus.values()[rs.getInt("status")];
+                }
+                rs.close();
+                stmt.close();
+            }
+        } catch (SQLException sqle) {
+            System.err.println(sqle.getMessage());
+        }
+        return status;
     }
 
     @Override
@@ -185,7 +223,7 @@ public class MySQL implements Database {
             conn.setCatalog(schema);
             conn.setAutoCommit(false);
             Statement stmt = conn.createStatement();
-            for (String sqlstmt : sb.toString().replaceAll("(?i)(^|;)(ALTER|CREATE|DROP|INSERT|RENAME|SET)", "$1ZZZZ$2").split("ZZZZ")) {
+            for (String sqlstmt : sb.toString().replaceAll("(?i)(^|;)(ALTER|CREATE|DROP|INSERT|UPDATE|RENAME|SET)", "$1ZZZZ$2").split("ZZZZ")) {
                 if (!sqlstmt.equals("")) {
                     stmt.addBatch(sqlstmt);
                 }
