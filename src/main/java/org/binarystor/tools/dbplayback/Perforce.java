@@ -167,6 +167,7 @@ public class Perforce implements Repository {
                                 if (db.setVersion(schema, script.getKey(), script.getValue().getDepotPathString(), 0, errMessage)){
                                     //Failure
                                  }
+                                break;
                             }
                         }
                     }
