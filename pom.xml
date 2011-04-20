@@ -6,11 +6,11 @@
     <packaging>jar</packaging>
     <version>0.1</version>
     <name>dbPlayback</name>
-    <url>http://www.dbrecorder.org</url>
+    <url>http://www.dbplayback.org</url>
     <licenses>
         <license>
             <name>BSD License</name>
-            <url>http://www.wave2.org/svn/dbplayback/trunk/LICENSE.txt</url>
+            <url>https://github.com/wave2/dbplayback/blob/master/LICENSE</url>
             <distribution>repo</distribution>
         </license>
     </licenses>
@@ -19,12 +19,12 @@
         <url>http://www.wave2.org</url>
     </organization>
     <issueManagement>
-        <system>Bugzilla</system>
-        <url>http://www.wave2.org/bugzilla/</url>
+        <system>github</system>
+        <url>https://github.com/wave2/dbplayback/issues</url>
     </issueManagement>
     <scm>
-        <connection>scm:svn:http://www.wave2.org/svn/dbplayback</connection>
-        <url>http://www.wave2.org/svnweb/Wave2%20Repository/browse/dbplayback</url>
+        <connection>scm:git:git://github.com/wave2/dbplayback</connection>
+        <url>https://github.com/wave2/dbplayback</url>
     </scm>
     <build>
         <plugins>
@@ -44,6 +44,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+		<version>2.3.2</version>
                 <configuration>
                     <source>1.6</source>
                     <target>1.6</target>
@@ -54,6 +55,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
+		<version>2.5</version>
                 <configuration>
                     <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
@@ -100,7 +102,7 @@
         <dependency>
             <groupId>com.perforce</groupId>
             <artifactId>p4java</artifactId>
-            <version>2009.3.262843</version>
+            <version>2011.1.297684</version>
         </dependency>
         <dependency>
             <groupId>mysql</groupId>
@@ -113,6 +115,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
+		<version>2.6</version>
                 <configuration>
                     <configLocation>config/sun_checks.xml</configLocation>
                 </configuration>
