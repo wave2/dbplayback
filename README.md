@@ -36,7 +36,7 @@ Please do! Go on, don't be shy.
 License
 -------
 
-Copyright &copy; 2007-2011 Wave2 Limited. All rights reserved.
+Copyright &copy; 2010-2011 Wave2 Limited. All rights reserved.
 Licensed under [BSD License].
 
 [BSD License]: https://github.com/wave2/mysqldump/raw/master/LICENSE
